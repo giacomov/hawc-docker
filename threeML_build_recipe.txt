@@ -1,0 +1,1 @@
+pip install git+https://github.com/giacomov/astromodels.git git+https://github.com/giacomov/3ML.git git+https://github.com/giacomov/cthreeML.git
