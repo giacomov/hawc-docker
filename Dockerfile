@@ -63,11 +63,37 @@ RUN cd /home/hawc/hawc_software/ && tar xf aerie.tar.gz
 RUN cd /home/hawc/hawc_software/ && rm -rf aerie.tar.gz
 
 # Build AERIE
-RUN cd $SOFTWARE_BASE/aerie/build && eval `$SOFTWARE_BASE/externals/ape-hawc-2.02.02/ape sh externals` && cmake -DCMAKE_INSTALL_PREFIX=../install ../src -DCMAKE_BUILD_TYPE=Release
-RUN cd $SOFTWARE_BASE/aerie/build && make 
-RUN cd $SOFTWARE_BASE/aerie/build && make test
-RUN cd $SOFTWARE_BASE/aerie/build && make install
+RUN cd $SOFTWARE_BASE/aerie/build && eval `$SOFTWARE_BASE/externals/ape-hawc-2.02.02/ape sh externals` && cmake -DCMAKE_INSTALL_PREFIX=../install -DCMAKE_BUILD_TYPE=Release -DENABLE_CXX11=ON ../src -Wno-dev -DCMAKE_EXE_LINKER_FLAGS="-Wl,--no-as-needed" -DCMAKE_SHARED_LINKER_FLAGS="-Wl,--no-as-needed" 
+RUN cd $SOFTWARE_BASE/aerie/build && eval `$SOFTWARE_BASE/externals/ape-hawc-2.02.02/ape sh externals` && make -j 4 
+
+# Copy calibration files
+COPY config-hawc.tar.gz /home/hawc/hawc_software/
+RUN cd /home/hawc/hawc_software/ && tar xf config-hawc.tar.gz && rm -rf config-hawc.tar.gz
+ENV CONFIG_HAWC=/home/hawc/hawc_software/config-hawc
+
+# Become root again to install python
+USER root
+# Install pythn packages
+RUN apt-get install -y python-pip
+RUN pip install numpy scipy ipython
+USER hawc
+
+# Run tests 
+RUN cd $SOFTWARE_BASE/aerie/build && eval `$SOFTWARE_BASE/externals/ape-hawc-2.02.02/ape sh externals` && make test CTEST_OUTPUT_ON_FAILURE=TRUE 
+
+# Install AERIE 
+RUN cd $SOFTWARE_BASE/aerie/build && eval `$SOFTWARE_BASE/externals/ape-hawc-2.02.02/ape sh externals` && make install
+
 # Setup environment
+COPY bashrc /home/hawc/.bashrc
+
+# Clean up to reduce the size of the container
+RUN rm -rf /home/hawc/hawc_software/aerie/src
+RUN rm -rf /home/hawc/hawc_software/aerie/build/
+RUN rm -rf /home/hawc/hawc_software/externals/ape-hawc-2.02.02/distfiles/*
+USER root
+RUN apt-get purge
+USER hawc
 
 # Create workdir
 RUN mkdir /home/hawc/workdir
