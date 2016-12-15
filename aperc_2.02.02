@@ -1,0 +1,6 @@
+[DEFAULT]
+base = /home/hawc/hawc_software/externals/2.02.02/
+build = /home/hawc/hawc_software/externals/tmp
+[ape]
+jobs = 1
+mirrors = us mx
