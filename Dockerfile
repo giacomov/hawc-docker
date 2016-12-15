@@ -23,7 +23,12 @@ RUN useradd -u 431 -r -g hawc -s /bin/bash -c "hawc user" hawc
 RUN mkdir -p /home/hawc
 RUN chown -R hawc:hawc /home/hawc
 
-# Become that user
+# ROOT look for libraries in some pre-defined paths, which unfortunately
+# do not exist on Ubuntu. This trick solves the problem by creating /usr/lib64
+# which usually does not exist and linking it to where the libraries live in Ubuntu 
+RUN ln -s /usr/lib/x86_64-linux-gnu /usr/lib64 
+
+# Become the hawc user, so the build is not owned by root 
 USER hawc
 
 ##############################
@@ -58,8 +63,8 @@ RUN cd /home/hawc/hawc_software/ && tar xf aerie.tar.gz
 RUN cd /home/hawc/hawc_software/ && rm -rf aerie.tar.gz
 
 # Build AERIE
-RUN cd $SOFTWARE_BASE/aerie/build && cmake -DCMAKE_INSTALL_PREFIX=../install ../src -DCMAKE_BUILD_TYPE=Release
-RUN cd $SOFTWARE_BASE/aerie/build && make -j 4
+RUN cd $SOFTWARE_BASE/aerie/build && eval `$SOFTWARE_BASE/externals/ape-hawc-2.02.02/ape sh externals` && cmake -DCMAKE_INSTALL_PREFIX=../install ../src -DCMAKE_BUILD_TYPE=Release
+RUN cd $SOFTWARE_BASE/aerie/build && make 
 RUN cd $SOFTWARE_BASE/aerie/build && make test
 RUN cd $SOFTWARE_BASE/aerie/build && make install
 # Setup environment
