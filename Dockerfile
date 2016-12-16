@@ -79,6 +79,12 @@ RUN cd /home/hawc/hawc_software/ && tar xf aerie.tar.gz && rm -rf aerie.tar.gz &
 # Setup environment
 COPY bashrc /home/hawc/.bashrc
 
+# Copy test data
+RUN mkdir -p /home/hawc/hawc_test_data
+COPY simulated_data/maptree_256.root /home/hawc/hawc_test_data
+COPY simulated_data/detector_response.root /home/hawc/hawc_test_data
+ENV HAWC_3ML_TEST_DATA_DIR=/home/hawc/hawc_test_data
+
 # Create workdir
 RUN mkdir /home/hawc/workdir
 

@@ -1,0 +1,11 @@
+# This is a prototype of source file
+
+# Name: Whatever word
+# ShapePosition: Point,RA,Dec or Disk,RA,Dec,Radius (all in degrees)
+# Spectrum: Usual, like 'SimplePowerLaw,3.5e-11,2.63' or
+# 'CutOffPowerLaw,3.76e-11,2.39,14.3'
+
+# Columns: Name ShapePosition Spectrum (anything after the initial 3 fields is ignored)
+
+PTest1  Point,100,22       CutOffPowerLaw,3.15e-11,2.37,42.3   one Crab
+DTest2  Disk,200,22,1.5    CutOffPowerLaw,1.32e-07,2.37,42.3   one Crab too, extended
