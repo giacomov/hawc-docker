@@ -85,6 +85,11 @@ COPY simulated_data/maptree_256.root /home/hawc/hawc_test_data
 COPY simulated_data/detector_response.root /home/hawc/hawc_test_data
 ENV HAWC_3ML_TEST_DATA_DIR=/home/hawc/hawc_test_data
 
+# Install virtualenv
+USER root
+RUN pip install virtualenv
+USER hawc
+
 # Create workdir
 RUN mkdir /home/hawc/workdir
 
