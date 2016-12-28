@@ -1,5 +1,5 @@
 # where I put stuff
-export SOFTWARE_BASE=/home/hawc/hawc_software
+export SOFTWARE_BASE=/hawc_software
 # ape stuff
 export APERC="$SOFTWARE_BASE/externals/aperc_2.02.02"
 eval `$SOFTWARE_BASE/externals/ape-hawc-2.02.02/ape sh externals`
