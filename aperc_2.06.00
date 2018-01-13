@@ -1,6 +1,6 @@
 [DEFAULT]
-base = /home/hawc/hawc_software/externals/2.02.02/
+base = /home/hawc/hawc_software/externals/2.06.00/
 build = /home/hawc/hawc_software/externals/tmp
 [ape]
-jobs = 1
+jobs = 8 
 mirrors = us mx
