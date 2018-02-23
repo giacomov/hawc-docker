@@ -1,4 +1,4 @@
-FROM ubuntu:16.04
+FROM condaforge/linux-anvil
 
 MAINTAINER Giacomo Vianello <giacomov@stanford.edu>
 
@@ -9,9 +9,6 @@ ARG hawcpasswd
 # Explicitly become root (even though likely we are root already)
 USER root
 ENV USER=root
-
-# Override the default shell (sh) with bash
-RUN rm /bin/sh && ln -s /bin/bash /bin/sh
 
 # Update repositories and install needed packages
 # I use one long line so that I can remove all .deb files at the end
