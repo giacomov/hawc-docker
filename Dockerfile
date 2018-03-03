@@ -1,43 +1,21 @@
-FROM condaforge/linux-anvil
+FROM condaforge/linux-anvil:root
 
 MAINTAINER Giacomo Vianello <giacomov@stanford.edu>
 
+USER root
+ENV USER='root'
+
 # Of course we do not want the password to download Externals in the Dockerfile. You need to
-# pass it as argument to docker build, using -build-arg hawcpasswd="[passwd]"
+# pass it as argument to docker build, using --build-arg hawcpasswd="[passwd]"
 ARG hawcpasswd
 
-# Explicitly become root (even though likely we are root already)
-USER root
-ENV USER=root
+RUN rm /bin/sh && ln -s /bin/bash /bin/sh
 
 # Update repositories and install needed packages
 # I use one long line so that I can remove all .deb files at the end
 # before Docker writes out this layer
 
-RUN apt-get update && apt-get install -y python2.7 python2.7-dev curl git subversion git build-essential bzip2 libbz2-dev dpkg-dev cmake binutils libpng12-dev libjpeg-dev gfortran libssl-dev libfftw3-dev libcfitsio-dev python-dev libgsl0-dev libx11-dev libxpm-dev libxft-dev libxext-dev python-pip python-tk && apt-get clean 
-
-# Needed for SSL to work (i.e., all https links and downloads)
-
-RUN mkdir /etc/pki
-RUN mkdir /etc/pki/tls
-RUN mkdir /etc/pki/tls/certs
-RUN apt-get install wget
-RUN wget http://curl.haxx.se/ca/cacert.pem
-RUN mv cacert.pem ca-bundle.crt
-RUN mv ca-bundle.crt /etc/pki/tls/certs
-
-# Install python packages needed by the tests of AERIE
-
-RUN pip install --no-cache-dir numpy scipy 'ipython<6.0' virtualenv
-
-
-# ROOT look for libraries in some pre-defined paths, which unfortunately
-# do not exist on Ubuntu. This trick solves the problem by liking the place
-# where libraries live in Ubuntu (/usr/lib/x86_64-linux-gnu) to where ROOT
-# expects them (/usr/lib64) 
-
-RUN ln -s /usr/lib/x86_64-linux-gnu /usr/lib64 
-
+RUN yum install svn -y
 
 ##############################
 #       AERIE BUILD
@@ -52,22 +30,44 @@ ENV SOFTWARE_BASE=/hawc_software
 RUN mkdir -p $SOFTWARE_BASE/externals/ && mkdir -p $SOFTWARE_BASE/externals/tmp
 
 # Copy aperc (APE configuration)
-COPY aperc_2.06.00 /hawc_software/externals/
+COPY aperc_2.06.00 $SOFTWARE_BASE/externals/
 
 # Set the aperc
 ENV APERC=/hawc_software/externals/aperc_2.06.00
 
-# Copy the AERIE code from the host
-
-COPY ape-hawc-2.06.00.tar.bz2 /hawc_software/externals/ 
+# Get APE
+RUN cd ${SOFTWARE_BASE}/externals && curl https://devel.auger.unam.mx/trac/projects/ape/downloads/75 --output ape-hawc-2.06.00.tar.bz2
 
 # Unpack ape, remove archive, run ape to install externals, then remove downloaded 
 # archives to save space
-RUN cd $SOFTWARE_BASE/externals/ && tar xf ape-hawc-2.06.00.tar.bz2 && rm -rf ape-hawc-2.06.00.tar.bz2 && cd $SOFTWARE_BASE/externals/ape-hawc-2.06.00 && echo $hawcpasswd | ./ape --verbose --no-keep --rc=$APERC install externals && rm -rf /hawc_software/externals/ape-hawc-2.06.00/distfiles/*
 
-# Copy calibration files
-COPY config-hawc.tar.gz /hawc_software/
-RUN cd /hawc_software/ && tar xf config-hawc.tar.gz && rm -rf config-hawc.tar.gz
+RUN cd ${SOFTWARE_BASE}/externals && \ 
+    tar xf ape-hawc-2.06.00.tar.bz2 && \
+    rm -rf ape-hawc-2.06.00.tar.bz2 && \
+    cd ape-hawc-2.06.00 && \
+    echo $hawcpasswd | ./ape --rc=$APERC fetch externals
+
+
+# Install conda packages and build externals
+ENV PATH=/opt/conda/bin:${PATH}
+RUN echo $PATH
+RUN conda create --name test_env -y python=2.7 numpy scipy ipython root5=5.34.36=py27_3 boost=1.63 fftw gsl xerces-c cmake cfitsio toolchain
+ENV PATH=/opt/rh/devtoolset-2/root/usr/bin:${PATH}
+RUN unset PYTHONPATH && \
+    source activate test_env && \
+    which python && \
+    which g++ && \
+    echo "exit()" | root -b && \
+    cd ${SOFTWARE_BASE}/externals && \ 
+    export CXXFLAGS="-DBOOST_MATH_DISABLE_FLOAT128 -m64 -I${CONDA_PREFIX}/include" && \
+    export CFLAGS="-m64 -I${CONDA_PREFIX}/include" && \
+    export LDFLAGS="-Wl,-rpath,${CONDA_PREFIX}/lib -L${CONDA_PREFIX}/lib" && \
+    cd ${SOFTWARE_BASE}/externals/ape-hawc-2.06.00 && \
+    ./ape --verbose --no-keep --rc=$APERC install externals && \
+    rm -rf /hawc_software/externals/ape-hawc-2.06.00/distfiles/*
+
+# Get calibration files
+RUN cd ${SOFTWARE_BASE} && svn co https://private.hawc-observatory.org/svn/hawc/workspaces/config-hawc/ --username hawc --password ${hawcpasswd} --non-interactive
 ENV CONFIG_HAWC=/hawc_software/config-hawc
 
 
@@ -75,11 +75,23 @@ ENV CONFIG_HAWC=/hawc_software/config-hawc
 # then remove build and src directories
 # This is all one command to stay in one layer (gaining a lot in terms of the size
 # of the final image)
-COPY aerie.tar.gz /hawc_software/
-RUN cd /hawc_software/ && tar xf aerie.tar.gz && rm -rf aerie.tar.gz && cd $SOFTWARE_BASE/aerie/build && eval `$SOFTWARE_BASE/externals/ape-hawc-2.06.00/ape sh externals` && cmake -DCMAKE_INSTALL_PREFIX=../install -DCMAKE_BUILD_TYPE=Release -DENABLE_CXX11=OFF ../src -Wno-dev -DCMAKE_EXE_LINKER_FLAGS="-Wl,--no-as-needed" -DCMAKE_SHARED_LINKER_FLAGS="-Wl,--no-as-needed" && make -j 8 && make test CTEST_OUTPUT_ON_FAILURE=TRUE && make install && rm -rf /hawc_software/aerie/src && rm -rf /hawc_software/aerie/build  
+RUN source activate test_env && \
+    cd ${SOFTWARE_BASE} && \
+    svn co https://private.hawc-observatory.org/svn/hawc/workspaces/aerie/trunk --username hawc --password ${hawcpasswd} --non-interactive && \
+    cd $SOFTWARE_BASE/trunk/build && \
+    eval `$SOFTWARE_BASE/externals/ape-hawc-2.06.00/ape sh externals` && \
+    export CXXFLAGS="-DBOOST_MATH_DISABLE_FLOAT128 -m64 -I${CONDA_PREFIX}/include" && \
+    export CFLAGS="-m64 -I${CONDA_PREFIX}/include" && \
+    export LDFLAGS="-Wl,-rpath,${CONDA_PREFIX}/lib -L${CONDA_PREFIX}/lib" && \
+    cmake -DCMAKE_INSTALL_PREFIX=../install -DCMAKE_BUILD_TYPE=Release -DENABLE_CXX11=OFF ../src -Wno-dev -DCMAKE_EXE_LINKER_FLAGS="${LDFLAGS} -Wl,--no-as-needed" -DCMAKE_SHARED_LINKER_FLAGS="${LDFLAGS} -Wl,--no-as-needed" && \
+    make -j 8 && \
+    make test CTEST_OUTPUT_ON_FAILURE=TRUE && \
+    make install && \
+    rm -rf ${SOFTWARE_BASE}/trunk/src && \
+    rm -rf ${SOFTWARE_BASE}/aerie/build  
 
 # Setup environment
-COPY config_hawc.sh /hawc_software/
+COPY config_hawc.sh ${SOFTWARE_BASE}
 
 # Copy test data
 RUN mkdir -p /hawc_test_data
@@ -88,10 +100,10 @@ COPY simulated_data/detector_response.root /hawc_test_data
 ENV HAWC_3ML_TEST_DATA_DIR=/hawc_test_data
 
 # Now make everything accessible by everybody
-RUN chmod --recursive a+rwx /hawc_software && chmod --recursive a+rwx /hawc_test_data
+RUN chmod --recursive a+rwx ${SOFTWARE_BASE} && chmod --recursive a+rwx /hawc_test_data
 
-# Finally install sudo
-RUN apt-get install sudo
 
+RUN conda clean -a -y
+RUN rm -rf /opt/conda/pkgs/*
 WORKDIR /
 

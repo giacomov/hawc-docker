@@ -1,6 +1,28 @@
 [DEFAULT]
-base = /home/hawc/hawc_software/externals/2.06.00/
-build = /home/hawc/hawc_software/externals/tmp
+base = /hawc_software/externals/2.06.00/
+build = /hawc_software/externals/tmp
 [ape]
-jobs = 8 
+jobs = 8
 mirrors = us mx
+
+[package externals]
+dependencies.delete = boost fftw gsl root xerces cmake cfitsio
+
+[package cmake]
+isHidden = True
+tarballs =
+extraFiles =
+environment =
+
+[package gsl]
+isHidden = True
+tarballs =
+extraFiles =
+environment =
+
+[package cfitsio]
+isHidden = True
+tarballs =
+extraFiles =
+environment =
+
